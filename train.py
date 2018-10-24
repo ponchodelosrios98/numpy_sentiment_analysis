@@ -82,7 +82,7 @@ class SentimentNetwork:
       # populate label_vocab with all of the words in the given labels.
       label_vocab = set()
 
-      # TODO: If it's a label then WTF? Should'nt just have 2 values (POSITIVE / NEGATIVE)?
+      # Positive / Negative Labels
       for label in labels:
         label_vocab.add(label)
       
@@ -116,39 +116,40 @@ class SentimentNetwork:
         # Initialize weights
 
         # These are the weights between the input layer and the hidden layer.
+        # Matrix is of the same of input_nodes to hidden_nodes (Layer)
         self.weights_0_1 = np.zeros((self.input_nodes,self.hidden_nodes))
 
         # These are the weights between the hidden layer and the output layer.
         self.weights_1_2 = np.random.normal(0.0, self.output_nodes**-0.5, 
                                                 (self.hidden_nodes, self.output_nodes))
         
-        ## New for Project 5: Removed self.layer_0; added self.layer_1
         # The input layer, a two-dimensional matrix with shape 1 x hidden_nodes
+        # TODO: What does this do?
         self.layer_1 = np.zeros((1,hidden_nodes))
     
-    ## New for Project 5: Removed update_input_layer function
-    
+    # Returns 0 (Negative) or 1 (Positive)
     def get_target_for_label(self,label):
         if(label == 'POSITIVE'):
             return 1
         else:
             return 0
-        
+
+    # Activation Function    
     def sigmoid(self,x):
         return 1 / (1 + np.exp(-x))
     
+    # Derivate Activation Function
     def sigmoid_output_2_derivative(self,output):
         return output * (1 - output)
     
-    ## New for Project 5: changed name of first parameter form 'training_reviews' 
-    #                     to 'training_reviews_raw'
     def train(self, training_reviews_raw, training_labels):
-
-        ## New for Project 5: pre-process training reviews so we can deal 
-        #                     directly with the indices of non-zero inputs
+        # Init training reviews
         training_reviews = list()
+
+        # Loops Over training Reviews
         for review in training_reviews_raw:
             indices = set()
+            # Grabs indices of word and put it in the set
             for word in review.split(" "):
                 if(word in self.word2index.keys()):
                     indices.add(self.word2index[word])
@@ -171,25 +172,16 @@ class SentimentNetwork:
             review = training_reviews[i]
             label = training_labels[i]
             
-            #### Implement the forward pass here ####
-            ### Forward pass ###
-
-            ## New for Project 5: Removed call to 'update_input_layer' function
-            #                     because 'layer_0' is no longer used
-
             # Hidden layer
-            ## New for Project 5: Add in only the weights for non-zero items
             self.layer_1 *= 0
+
+            # Layer_1 Grabs the weights of given index
             for index in review:
                 self.layer_1 += self.weights_0_1[index]
 
-            # Output layer
-            ## New for Project 5: changed to use 'self.layer_1' instead of 'local layer_1'
+            # OActivation Function between weights and inputs
             layer_2 = self.sigmoid(self.layer_1.dot(self.weights_1_2))            
             
-            #### Implement the backward pass here ####
-            ### Backward pass ###
-
             # Output error
             layer_2_error = layer_2 - self.get_target_for_label(label) # Output layer error is the difference between desired target and actual output.
             layer_2_delta = layer_2_error * self.sigmoid_output_2_derivative(layer_2)
@@ -199,10 +191,8 @@ class SentimentNetwork:
             layer_1_delta = layer_1_error # hidden layer gradients - no nonlinearity so it's the same as the error
 
             # Update the weights
-            ## New for Project 5: changed to use 'self.layer_1' instead of local 'layer_1'
             self.weights_1_2 -= self.layer_1.T.dot(layer_2_delta) * self.learning_rate # update hidden-to-output weights with gradient descent step
             
-            ## New for Project 5: Only update the weights that were used in the forward pass
             for index in review:
                 self.weights_0_1[index] -= layer_1_delta[0] * self.learning_rate # update input-to-hidden weights with gradient descent step
 
@@ -229,10 +219,8 @@ class SentimentNetwork:
         Attempts to predict the labels for the given testing_reviews,
         and uses the test_labels to calculate the accuracy of those predictions.
         """
-        
         # keep track of how many correct predictions we make
         correct = 0
-
         # we'll time how many predictions per second we make
         start = time.time()
 
@@ -284,3 +272,28 @@ class SentimentNetwork:
             return "POSITIVE"
         else:
             return "NEGATIVE"
+
+# Open Reviews Files and separate them by lines
+g = open('reviews.txt','r')
+reviews = list(map(lambda x:x[:-1],g.readlines()))
+g.close()
+
+# Open Labels (Targets) and separate them by lines
+g = open('labels.txt','r')
+labels = list(map(lambda x:x[:-1].upper(),g.readlines()))
+g.close()
+
+mlp = SentimentNetwork(reviews[:-1000],labels[:-1000],min_count=20,polarity_cutoff=0.05,learning_rate=0.01)
+print('--------')
+print('TRAINING:')
+print('--------')
+mlp.train(reviews[:-1000],labels[:-1000])
+print('--------')
+print('TESTING:')
+print('--------')
+mlp.test(reviews[-1000:],labels[-1000:])
+print('--------')
+print('GIVE RANDOM REVIEW')
+print('--------')
+prediction = mlp.run(reviews[0])
+print('{} = {}'.format(prediction, labels[0]))
